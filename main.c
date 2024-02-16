@@ -47,7 +47,7 @@ void main()
     em_initialize();
 
     /* global 로 선언하여 signal post 하는데에서 사용 해야 한다. */
-    const char *test_event_group = "TEST_EVENT";
+    const char *test_event_group = "ETHERNET_EVENTS";
     typedef enum {
         TEST_EVENT_00,
         TEST_EVENT_01,

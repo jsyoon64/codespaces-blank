@@ -408,14 +408,24 @@ void em_events_register(const char *groupname, int16_t enum_event)
 void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *event)
 {
     uint8_t *event_msg_backup = NULL;
-    em_event_arg_type current_event;
+    em_event_arg_type *current_event;
     int16_t isbackupreq = -1;
 
-    memcpy(&current_event, event, sizeof(em_event_arg_type));
+    if(event != NULL) {
+        #ifdef PC_SIMULATION
+        current_event = (em_event_arg_type *)malloc(sizeof(em_event_arg_type));
+        #else
+        current_event = (em_event_arg_type *)pvPortMalloc(sizeof(em_event_arg_type));
+        #endif 
+        memcpy(current_event, event, sizeof(em_event_arg_type));
+    }
+    else {
+        current_event = NULL;
+    }
 
     #if (HANDLER_REQUIRED_MEMORYFREE < 0)
     /* memory free 는 event manager에서 수행 됨 */
-    current_event.isconst = 1;
+    current_event->isconst = 1;
     #endif
 
     /* Search registered groupname */
@@ -429,7 +439,7 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
         return;
     }
 
-    #if (HANDLER_REQUIRED_MEMORYFREE < 0)
+    #if (HANDLER_REQUIRED_MEMORYFREE > 0)
     isbackupreq = is_event_backup_require(group_index, event, signal);
     #endif
 
@@ -439,22 +449,19 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
     em_handler_list_type *gListHandler = group->grphandler;
     while (gListHandler != NULL) {
         if(isbackupreq > 0) {
-            event_msg_backup = em_NewMem(event);
+            event_msg_backup = em_NewMem(current_event);
         }
-        gListHandler->handler(groupname, signal, &current_event);
+        gListHandler->handler(groupname, signal, current_event);
         gListHandler = gListHandler->pNext;
 
         if(event_msg_backup != NULL) {
-            current_event.msg = event_msg_backup;
+            current_event->msg = event_msg_backup;
         }
     }
 
-    /* isbackupreq > 0 일 경우  1개의 event_msg_backup 남아 있음 */
-    #ifdef PC_SIMULATION
-        free(event_msg_backup);
-    #else
-        vPortFree(event_msg_backup);
-    #endif 
+    /* isbackupreq > 0 일 경우  1개의 event_msg_backup 남아 있음 
+       current_event->msg에 내용이 있음.
+    */
 
     /* 2. Event handler 
     */    
@@ -462,13 +469,13 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
     em_handler_list_type *eListHandler = evt_handler->handler;
     while (eListHandler != NULL) {
         if(isbackupreq > 0) {
-            event_msg_backup = em_NewMem(event);
+            event_msg_backup = em_NewMem(current_event);
         }
-        eListHandler->handler(groupname, signal, event);
+        eListHandler->handler(groupname, signal, current_event);
         eListHandler = eListHandler->pNext;
 
         if(event_msg_backup != NULL) {
-            current_event.msg = event_msg_backup;
+            current_event->msg = event_msg_backup;
         }
     }
     /* isbackupreq > 0 일 경우  1개의 event_msg_backup 남아 있음 */
@@ -478,8 +485,17 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
         vPortFree(event_msg_backup);
     #endif 
 
-    // free backup event
+
+    if(current_event) {
+        #ifdef PC_SIMULATION
+            free(current_event);
+        #else
+            vPortFree(current_event);
+        #endif 
+    }
+    #if (HANDLER_REQUIRED_MEMORYFREE < 0)
     EM_IS_MEMFREEREQUIRED(event);
+    #endif
 }
 
 /**
