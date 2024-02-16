@@ -55,11 +55,14 @@ static em_event_group_list_type root_event_list;
 void em_default_handler(const char *groupname, int16_t signal, em_event_arg_type *ev)
 {
     #ifdef PC_SIMULATION
-    printf("default: %s event(0x%04x) triggered!\n", groupname, signal);
+    printf("Default Handler: Event group(%s) event(0x%04x) arg(%p) triggered!\n", groupname, signal, ev);
     #else
-    DEBUGHI(GEN,"default: %s event(0x%04x) triggered!\n", groupname, signal);
-    #endif 
+    DEBUGHI(GEN,"Default Handler: Event group(%s) event(0x%04x) arg(%p) triggered!\n", groupname, signal, ev);
+    #endif
+
+    #if (DEFAULT_HANDLER_NO_MEM_FREE < 0)
     EM_IS_MEMFREEREQUIRED(ev);
+    #endif
 }
 
 #if (HANDLER_REQUIRED_MEMORYFREE > 0)
@@ -191,15 +194,23 @@ em_event_id_type *getEventHandler(em_event_group_type *group, int16_t event)
   */
 int is_event_backup_require(int16_t group_index, em_event_arg_type *event, int16_t signal)
 {
+
     #if (HANDLER_REQUIRED_MEMORYFREE > 0)
     int count;
 
     if ((event == NULL) || (event->msg == NULL) || (event->isconst == 1)) {
         return -1;
     }
-
     em_event_group_type *group = &root_event_list.group[group_index];
-    count = getHandlerCount(group->grphandler);
+    em_handler_list_type *handler = group->grphandler;
+    
+    /* default handler */
+    #if (DEFAULT_HANDLER_NO_MEM_FREE > 0)
+    if(handler) {
+        handler = handler->pNext;
+    }
+    #endif
+    count = getHandlerCount(handler);
     
     em_event_id_type *evt_handler = getEventHandler(group, signal);
     if(evt_handler) {
@@ -301,16 +312,16 @@ void em_on_event(const char *groupname, int16_t signal, evt_handler_fp handler)
         else {
             /* group 등록이 되어 있지 않음 */
             #ifdef PC_SIMULATION
-            printf("%s Group not registered!!!\n", groupname);
+            printf("Event group(%s) not registered!!!\n", groupname);
             #else
-            DEBUGMED(GEN,"%s Group not registered!!!\n", groupname);
+            DEBUGMED(GEN,"Event group(%s)not registered!!!\n", groupname);
             #endif             
         }
 
         #ifdef PC_SIMULATION
-        printf("%s Group Event(%d) is requested!!!\n", groupname, signal);
+        printf("Event group(%s) Event(0x%04x) is requested!!!\n", groupname, signal);
         #else
-        DEBUGMED(GEN,"%s Group Event(%d) is requested!!!\n", groupname, signal);
+        DEBUGMED(GEN,"Event group(%s) Event(0x%04x) is requested!!!\n", groupname, signal);
         #endif         
     }
     else {
@@ -447,15 +458,23 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
     /* 1. Group handler 
     */    
     em_handler_list_type *gListHandler = group->grphandler;
-    while (gListHandler != NULL) {
-        if(isbackupreq > 0) {
-            event_msg_backup = em_NewMem(current_event);
-        }
+
+    if(gListHandler != NULL) {
+        /* default handler */
+        #if (DEFAULT_HANDLER_NO_MEM_FREE > 0)
         gListHandler->handler(groupname, signal, current_event);
         gListHandler = gListHandler->pNext;
+        #endif
+        while (gListHandler != NULL) {
+            if(isbackupreq > 0) {
+                event_msg_backup = em_NewMem(current_event);
+            }
+            gListHandler->handler(groupname, signal, current_event);
+            gListHandler = gListHandler->pNext;
 
-        if(event_msg_backup != NULL) {
-            current_event->msg = event_msg_backup;
+            if(event_msg_backup != NULL) {
+                current_event->msg = event_msg_backup;
+            }
         }
     }
 
