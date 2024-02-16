@@ -35,7 +35,7 @@
   -1: event manager에서 memory free 수행 함.
 */
 #define DEFAULT_HANDLER_NO_MEM_FREE             (1)
-#define HANDLER_REQUIRED_MEMORYFREE             (1)
+#define HANDLER_REQUIRED_MEMORYFREE             (-1)
 
 /* 1: 각 group별 event enum이 0 부터 시작 해서 순서 대로 되어 있어 event갯수로 한꺼번에 register 됨
   -1: 각 group별 event enum이 연속적이이 않아서 event별로 register해야 함.

@@ -177,7 +177,4 @@ void main()
     printf("\nTrigger AUDIO_EVENT_01 with const event argument\n");
     em_event_trigger(audio_event_group, AUDIO_EVENT_01, &arg1);
     free(arg1.msg);
-
-
-
 }

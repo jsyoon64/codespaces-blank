@@ -65,7 +65,6 @@ void em_default_handler(const char *groupname, int16_t signal, em_event_arg_type
     #endif
 }
 
-#if (HANDLER_REQUIRED_MEMORYFREE > 0)
 /**
   * @brief  em_NewMem
   * @note
@@ -102,7 +101,6 @@ uint8_t *em_NewMem(em_event_arg_type *event)
     /* TODO error return required */
     return ev_buf;
 }
-#endif
 
 
 /**
@@ -429,15 +427,18 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
         current_event = (em_event_arg_type *)pvPortMalloc(sizeof(em_event_arg_type));
         #endif 
         memcpy(current_event, event, sizeof(em_event_arg_type));
+
+        #if (HANDLER_REQUIRED_MEMORYFREE > 0)
+        isbackupreq = is_event_backup_require(group_index, event, signal);
+        #else
+        /* memory free 는 event manager에서 수행 됨 */
+        current_event->isconst = 1;
+        #endif
+
     }
     else {
         current_event = NULL;
     }
-
-    #if (HANDLER_REQUIRED_MEMORYFREE < 0)
-    /* memory free 는 event manager에서 수행 됨 */
-    current_event->isconst = 1;
-    #endif
 
     /* Search registered groupname */
     int16_t group_index = check_is_registered_group(groupname);
@@ -449,10 +450,6 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
         #endif  
         return;
     }
-
-    #if (HANDLER_REQUIRED_MEMORYFREE > 0)
-    isbackupreq = is_event_backup_require(group_index, event, signal);
-    #endif
 
     em_event_group_type *group = &root_event_list.group[group_index];
     /* 1. Group handler 
@@ -498,12 +495,13 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
         }
     }
     /* isbackupreq > 0 일 경우  1개의 event_msg_backup 남아 있음 */
-    #ifdef PC_SIMULATION
+    if(event_msg_backup) {
+        #ifdef PC_SIMULATION
         free(event_msg_backup);
-    #else
+        #else
         vPortFree(event_msg_backup);
-    #endif 
-
+        #endif 
+    }
 
     if(current_event) {
         #ifdef PC_SIMULATION
@@ -512,7 +510,7 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
             vPortFree(current_event);
         #endif 
     }
-    #if (HANDLER_REQUIRED_MEMORYFREE < 0)
+    #if (HANDLER_REQUIRED_MEMORYFREE <= 0)
     EM_IS_MEMFREEREQUIRED(event);
     #endif
 }
