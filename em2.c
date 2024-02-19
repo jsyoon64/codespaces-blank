@@ -564,4 +564,23 @@ void em_initialize(void)
         root_event_list.group[i].event_group.gid = -1;
     }
 
+    //memory allocation error
+    #ifdef PC_SIMULATION
+    printf("\n============ DEFINITIONS ==============\n");
+    printf("PC_SIMULATION is ON\n");
+    printf("MAX_ROOT_EVENT_GROUP_COUNT is %d\n", MAX_ROOT_EVENT_GROUP_COUNT);
+    printf("DEFAULT_HANDLER_NO_MEM_FREE is %s\n", DEFAULT_HANDLER_NO_MEM_FREE > 0 ? "ON":"OFF");
+    printf("HANDLER_REQUIRED_MEMORYFREE is %s\n", HANDLER_REQUIRED_MEMORYFREE > 0 ? "ON":"OFF");
+    printf("FEATURE_SEQUENCE_EVENT_ENUM is %s\n", FEATURE_SEQUENCE_EVENT_ENUM > 0 ? "ON":"OFF");
+    printf("=======================================\n");
+
+    #else
+    DEBUGHI(GEN,"PC_SIMULATION is OFF\n")
+    DEBUGHI(GEN,"MAX_ROOT_EVENT_GROUP_COUNT is %d\n", MAX_ROOT_EVENT_GROUP_COUNT);
+    DEBUGHI(GEN,"DEFAULT_HANDLER_NO_MEM_FREE is %s\n", DEFAULT_HANDLER_NO_MEM_FREE > 0 ? "ON":"OFF");
+    DEBUGHI(GEN,"HANDLER_REQUIRED_MEMORYFREE is %s\n", HANDLER_REQUIRED_MEMORYFREE > 0 ? "ON":"OFF");
+    DEBUGHI(GEN,"FEATURE_SEQUENCE_EVENT_ENUM is %s\n", FEATURE_SEQUENCE_EVENT_ENUM > 0 ? "ON":"OFF");
+    DEBUGHI(GEN,"=======================================\n");
+    #endif  
+
 }
