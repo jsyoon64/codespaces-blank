@@ -47,7 +47,12 @@ void main()
     em_initialize();
 
     /* global 로 선언하여 signal post 하는데에서 사용 해야 한다. */
-    const char *ether_event_group = "ETHERNET_EVENTS";
+    em_group_name_type ether_event_group = 
+    {
+        .name = "ETHERNET_EVENTS",
+        .gid = -1
+    };
+
     typedef enum {
         ETHERNET_EVENT_00,
         ETHERNET_EVENT_01,
@@ -56,9 +61,14 @@ void main()
         ETHERNET_EVENT_04,
         ETHERNET_EVENT_05,
         ETHERNET_EVENT_MAX
-    }ethernet_event_type;
+    }ether_group_event_type;
 
-    const char *audio_event_group = "AUDIO_EVENTS";
+    em_group_name_type audio_event_group = 
+    {
+        .name = "AUDIO_EVENTS",
+        .gid = -1
+    };
+
     typedef enum {
         AUDIO_EVENT_00,
         AUDIO_EVENT_01,
@@ -67,30 +77,30 @@ void main()
         AUDIO_EVENT_04,
         AUDIO_EVENT_05,
         AUDIO_EVENT_MAX
-    }audio_event_type;
+    }audio_group_event_type;
 
 
     /* Event register */
     #if (FEATURE_SEQUENCE_EVENT_ENUM > 0)
-    em_events_register(ether_event_group, (int16_t)ETHERNET_EVENT_MAX);
+    em_events_register(&ether_event_group, (int16_t)ETHERNET_EVENT_MAX);
     #else
-    em_events_register(ether_event_group, (int16_t)ETHERNET_EVENT_00);
-    em_events_register(ether_event_group, (int16_t)ETHERNET_EVENT_01);
-    em_events_register(ether_event_group, (int16_t)ETHERNET_EVENT_02);
-    em_events_register(ether_event_group, (int16_t)ETHERNET_EVENT_03);
-    em_events_register(ether_event_group, (int16_t)ETHERNET_EVENT_04);
-    em_events_register(ether_event_group, (int16_t)ETHERNET_EVENT_05);
+    em_events_register(&ether_event_group, (int16_t)ETHERNET_EVENT_00);
+    em_events_register(&ether_event_group, (int16_t)ETHERNET_EVENT_01);
+    em_events_register(&ether_event_group, (int16_t)ETHERNET_EVENT_02);
+    em_events_register(&ether_event_group, (int16_t)ETHERNET_EVENT_03);
+    em_events_register(&ether_event_group, (int16_t)ETHERNET_EVENT_04);
+    em_events_register(&ether_event_group, (int16_t)ETHERNET_EVENT_05);
     #endif
 
     #if (FEATURE_SEQUENCE_EVENT_ENUM > 0)
-    em_events_register(audio_event_group, (int16_t)AUDIO_EVENT_MAX);
+    em_events_register(&audio_event_group, (int16_t)AUDIO_EVENT_MAX);
     #else
-    em_events_register(audio_event_group, (int16_t)AUDIO_EVENT_00);
-    em_events_register(audio_event_group, (int16_t)AUDIO_EVENT_01);
-    em_events_register(audio_event_group, (int16_t)AUDIO_EVENT_02);
-    em_events_register(audio_event_group, (int16_t)AUDIO_EVENT_03);
-    em_events_register(audio_event_group, (int16_t)AUDIO_EVENT_04);
-    em_events_register(audio_event_group, (int16_t)AUDIO_EVENT_05);
+    em_events_register(&audio_event_group, (int16_t)AUDIO_EVENT_00);
+    em_events_register(&audio_event_group, (int16_t)AUDIO_EVENT_01);
+    em_events_register(&audio_event_group, (int16_t)AUDIO_EVENT_02);
+    em_events_register(&audio_event_group, (int16_t)AUDIO_EVENT_03);
+    em_events_register(&audio_event_group, (int16_t)AUDIO_EVENT_04);
+    em_events_register(&audio_event_group, (int16_t)AUDIO_EVENT_05);
     #endif
 
 
@@ -100,16 +110,16 @@ void main()
     printf("\nEthernet Events test-------------------------------\n");
 
     /* Event 발생시 통보 요청 */
-    em_on_event(ether_event_group, -1, group_handler);
-    em_on_event(ether_event_group, ETHERNET_EVENT_01, test2_handler);
-    em_on_event(ether_event_group, ETHERNET_EVENT_03, test2_handler);
-    em_on_event(ether_event_group, ETHERNET_EVENT_03, test3_handler);
+    em_on_event(&ether_event_group, -1, group_handler);
+    em_on_event(&ether_event_group, ETHERNET_EVENT_01, test2_handler);
+    em_on_event(&ether_event_group, ETHERNET_EVENT_03, test2_handler);
+    em_on_event(&ether_event_group, ETHERNET_EVENT_03, test3_handler);
 
     printf("\nTrigger ETHERNET_EVENT_01 with argument NULL\n");
-    em_event_trigger(ether_event_group, ETHERNET_EVENT_01, NULL);
+    em_event_trigger(&ether_event_group, ETHERNET_EVENT_01, NULL);
 
     printf("\nTrigger ETHERNET_EVENT_03 with argument NULL\n");
-    em_event_trigger(ether_event_group, ETHERNET_EVENT_03, NULL);
+    em_event_trigger(&ether_event_group, ETHERNET_EVENT_03, NULL);
 
     em_event_arg_type arg1;
 
@@ -121,7 +131,7 @@ void main()
     memcpy(arg1.msg,"QQQQQ",arg1.len);
 
     printf("\nTrigger ETHERNET_EVENT_03 with event argument\n");
-    em_event_trigger(ether_event_group, ETHERNET_EVENT_03, &arg1);
+    em_event_trigger(&ether_event_group, ETHERNET_EVENT_03, &arg1);
 
 
     /* const buffer test */
@@ -132,7 +142,7 @@ void main()
     memcpy(arg1.msg,"CONST",arg1.len);
 
     printf("\nTrigger ETHERNET_EVENT_03 with const argument\n");
-    em_event_trigger(ether_event_group, ETHERNET_EVENT_03, &arg1);
+    em_event_trigger(&ether_event_group, ETHERNET_EVENT_03, &arg1);
     free(arg1.msg);
 
 
@@ -142,19 +152,19 @@ void main()
     printf("\nAudio Events test-------------------------------\n");
 
     /* Event 발생시 통보 요청 */
-    em_on_event(audio_event_group, -1, group_handler);
-    em_on_event(audio_event_group, AUDIO_EVENT_00, test2_handler);
-    em_on_event(audio_event_group, AUDIO_EVENT_01, test2_handler);
-    em_on_event(audio_event_group, AUDIO_EVENT_01, test3_handler);
+    em_on_event(&audio_event_group, -1, group_handler);
+    em_on_event(&audio_event_group, AUDIO_EVENT_00, test2_handler);
+    em_on_event(&audio_event_group, AUDIO_EVENT_01, test2_handler);
+    em_on_event(&audio_event_group, AUDIO_EVENT_01, test3_handler);
 
     printf("\nTrigger AUDIO_EVENT_00 with argument NULL \n");
-    em_event_trigger(audio_event_group, AUDIO_EVENT_00, NULL);
+    em_event_trigger(&audio_event_group, AUDIO_EVENT_00, NULL);
 
     printf("\nTrigger AUDIO_EVENT_01 with argument NULL\n");
-    em_event_trigger(audio_event_group, AUDIO_EVENT_01, NULL);
+    em_event_trigger(&audio_event_group, AUDIO_EVENT_01, NULL);
 
     printf("\nTrigger AUDIO_EVENT_03. No action\n");
-    em_event_trigger(audio_event_group, AUDIO_EVENT_03, NULL);
+    em_event_trigger(&audio_event_group, AUDIO_EVENT_03, NULL);
 
      /* allocated memory test */
     arg1.isconst = 0;
@@ -164,7 +174,7 @@ void main()
     memcpy(arg1.msg,"AUDIO EVENT TEST",arg1.len);
 
     printf("\nTrigger AUDIO_EVENT_00 with event allocated argument\n");
-    em_event_trigger(audio_event_group, AUDIO_EVENT_00, &arg1);
+    em_event_trigger(&audio_event_group, AUDIO_EVENT_00, &arg1);
 
 
     /* const buffer test */
@@ -175,6 +185,6 @@ void main()
     memcpy(arg1.msg,"CONST AUDIO EVENT",arg1.len);
 
     printf("\nTrigger AUDIO_EVENT_01 with const event argument\n");
-    em_event_trigger(audio_event_group, AUDIO_EVENT_01, &arg1);
+    em_event_trigger(&audio_event_group, AUDIO_EVENT_01, &arg1);
     free(arg1.msg);
 }

@@ -43,6 +43,14 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 static em_event_group_list_type root_event_list;
+static em_event_arg_type trigger_event;
+
+uint8_t *event_msg_backup;
+em_event_arg_type *current_event;
+em_event_group_type *group;
+em_handler_list_type *gListHandler;
+em_event_id_type *evt_handler;
+em_handler_list_type *eListHandler;
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private function code -----------------------------------------------------*/
@@ -66,12 +74,12 @@ void em_default_handler(const char *groupname, int16_t signal, em_event_arg_type
 }
 
 /**
-  * @brief  em_NewMem
+  * @brief  em_NewEventMem
   * @note
   * @param  None
   * @retval None
   */
-uint8_t *em_NewMem(em_event_arg_type *event)
+uint8_t *em_NewEventMem(em_event_arg_type *event)
 {
     uint8_t *ev_buf = NULL;
 
@@ -90,7 +98,7 @@ uint8_t *em_NewMem(em_event_arg_type *event)
         #ifdef PC_SIMULATION
         printf("Memory allocation error\n");
         #else
-        DEBUGERR(GEN, AllocErrMsg("em_NewMem"));
+        DEBUGERR(GEN, AllocErrMsg("em_NewEventMem"));
         #endif  
     }
     else {
@@ -124,17 +132,41 @@ em_handler_list_type *createNode(evt_handler_fp handler)
 }
 
 /**
-  * @brief  check_is_registered_group
+  * @brief  get_registered_group
   * @note   이미 등록 되어 있는 EVENT GROUP 인지 판단
   * @param  None
   * @retval None
   */
-int check_is_registered_group(const char *groupname)
+em_event_group_type *get_registered_group(em_group_name_type *eventgroup)
 {
-    for(int i=0;i<root_event_list.group_cnt;i++) {
-        if( strcmp(root_event_list.group[i].name, groupname) == 0) {
-            return i;
+    if( (eventgroup->gid >= 0 ) && ( eventgroup->gid < MAX_ROOT_EVENT_GROUP_COUNT ) )
+    {
+        if( strcmp(root_event_list.group[eventgroup->gid].event_group.name, eventgroup->name) == 0) {
+            return &root_event_list.group[eventgroup->gid];
+        }        
+        else {
+            #ifdef PC_SIMULATION
+            printf("Group name(%s) is not registered!!!\n", eventgroup->name);
+            #else
+            DEBUGERR(GEN,"Group name(%s) is not registered!!!\n", eventgroup->name);
+            #endif              
+            return NULL;
         }
+    }
+    return NULL;
+}
+
+/**
+  * @brief  get_registered_group
+  * @note   이미 등록 되어 있는 EVENT GROUP index
+  * @param  None
+  * @retval None
+  */
+int get_registered_groupID(em_group_name_type *eventgroup)
+{
+    if((eventgroup->gid >= 0 ) && (eventgroup->gid < MAX_ROOT_EVENT_GROUP_COUNT ) )
+    {
+        return eventgroup->gid;
     }
     return -1;
 }
@@ -280,19 +312,17 @@ void addToTailEventList(em_event_id_type **head, em_event_id_type *node)
   * @param  None
   * @retval None
   */
-void em_on_event(const char *groupname, int16_t signal, evt_handler_fp handler)
+void em_on_event(em_group_name_type *eventgroup, int16_t signal, evt_handler_fp handler)
 {
     em_handler_list_type *new_node;
     em_event_group_type *group;
     em_event_id_type *evt_handler;
 
-    if( groupname && handler ) {
+    if( eventgroup->name && handler ) {
         /* 등록된 그룹인지 확인 한다. */
-        int16_t group_index = check_is_registered_group(groupname);
-
-        if( group_index >= 0 ) {
+        em_event_group_type *group = get_registered_group(eventgroup);
+        if( group != NULL ) {
             new_node = createNode(handler);
-            group = &root_event_list.group[group_index];
 
             /* GROUP의 모든 EVENT에 대해 통보*/
             if(signal < 0) {
@@ -306,21 +336,20 @@ void em_on_event(const char *groupname, int16_t signal, evt_handler_fp handler)
                     addToTailHandlerList(&evt_handler->handler, new_node);
                 }
             }            
+            #ifdef PC_SIMULATION
+            printf("Event group(%s) Event(0x%04x) is requested!!!\n", eventgroup->name, signal);
+            #else
+            DEBUGMED(GEN,"Event group(%s) Event(0x%04x) is requested!!!\n", eventgroup->name, signal);
+            #endif         
         }
         else {
             /* group 등록이 되어 있지 않음 */
             #ifdef PC_SIMULATION
-            printf("Event group(%s) not registered!!!\n", groupname);
+            printf("Event group(%s) not registered!!!\n", eventgroup->name);
             #else
-            DEBUGMED(GEN,"Event group(%s)not registered!!!\n", groupname);
+            DEBUGMED(GEN,"Event group(%s)not registered!!!\n", eventgroup->name);
             #endif             
         }
-
-        #ifdef PC_SIMULATION
-        printf("Event group(%s) Event(0x%04x) is requested!!!\n", groupname, signal);
-        #else
-        DEBUGMED(GEN,"Event group(%s) Event(0x%04x) is requested!!!\n", groupname, signal);
-        #endif         
     }
     else {
         #ifdef PC_SIMULATION
@@ -338,21 +367,27 @@ void em_on_event(const char *groupname, int16_t signal, evt_handler_fp handler)
   * @retval None
   */
 #if (FEATURE_SEQUENCE_EVENT_ENUM > 0)
-void em_events_register(const char *groupname, int16_t event_count)
+void em_events_register(em_group_name_type *eventgroup, int16_t event_count)
 #else
-void em_events_register(const char *groupname, int16_t enum_event)
+void em_events_register(em_group_name_type *eventgroup, int16_t enum_event)
 #endif
 {
     uint16_t grp_cnt = root_event_list.group_cnt;
 
-    if( groupname ) {
+    if( eventgroup->name ) {
         /*새로운 GROUP인지, 이미 등록된 그룹인지 */
-        int16_t group_index = check_is_registered_group(groupname);
-        if( group_index < 0 ) {
-            root_event_list.group[grp_cnt].name = groupname;
+        em_event_group_type *group = get_registered_group(eventgroup);
+        if( group == NULL ) {
+            group = &root_event_list.group[grp_cnt];
+
+            group->event_group.name = eventgroup->name;
+            group->event_group.gid = grp_cnt;
+
+            eventgroup->gid = grp_cnt;
+
             /* Add Group Handler */
             em_handler_list_type *gHandler = createNode(em_default_handler);
-            root_event_list.group[grp_cnt].grphandler = gHandler;
+            group->grphandler = gHandler;
 
             /* Add event andler */
             #if (FEATURE_SEQUENCE_EVENT_ENUM > 0)
@@ -362,8 +397,8 @@ void em_events_register(const char *groupname, int16_t enum_event)
                 em_event_id_type *evhandle = (em_event_id_type *)pvPortMalloc(sizeof(em_event_id_type)*event_count);
                 #endif 
                 memset(evhandle,0,sizeof(em_event_id_type)*event_count);
-                root_event_list.group[grp_cnt].evthandler = evhandle; /* array로 access 하면 됨 */
-                root_event_list.group[grp_cnt].group_evt_cnt = event_count;
+                group->evthandler = evhandle; /* array로 access 하면 됨 */
+                group->group_evt_cnt = event_count;
 
             #else
                 #ifdef PC_SIMULATION
@@ -373,16 +408,14 @@ void em_events_register(const char *groupname, int16_t enum_event)
                 #endif 
                 evt_handler->event = enum_event;
                 evt_handler->handler = NULL;
-                root_event_list.group[grp_cnt].evthandler = evt_handler;
-
-                root_event_list.group[grp_cnt].group_evt_cnt = 1;
+                group->evthandler = evt_handler;
+                group->group_evt_cnt = 1;
             #endif
             root_event_list.group_cnt++;
         }
         else {
             #if (FEATURE_SEQUENCE_EVENT_ENUM < 0)
                 /* GROUP이 이미 등록 되어 있음 */
-                em_event_group_type *group = &root_event_list.group[group_index];
 
                 /* Add event andler */
                 #ifdef PC_SIMULATION
@@ -392,13 +425,15 @@ void em_events_register(const char *groupname, int16_t enum_event)
                 #endif 
                 evt_handler->event = enum_event;
                 evt_handler->handler = NULL;
+
                 addToTailEventList(&group->evthandler, evt_handler);
+
                 group->group_evt_cnt++;
             #else
                 #ifdef PC_SIMULATION
-                printf("%s Group already registered!!!\n", groupname);
+                printf("%s Group already registered!!!\n", eventgroup->name);
                 #else
-                DEBUGERR(GEN,"%s Group already registered!!!\n", groupname);
+                DEBUGERR(GEN,"%s Group already registered!!!\n", eventgroup->name);
                 #endif                  
             #endif
         }
@@ -414,19 +449,40 @@ void em_events_register(const char *groupname, int16_t enum_event)
   * @param  None
   * @retval None
   */
-void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *event)
+void em_event_trigger(em_group_name_type *eventgroup, int16_t signal, em_event_arg_type *event)
 {
-    uint8_t *event_msg_backup = NULL;
-    em_event_arg_type *current_event;
+    /* move from stack to static */
+    // uint8_t *event_msg_backup = NULL;
+    // em_event_arg_type *current_event = NULL;
+    // em_event_group_type *group = NULL;
+    // em_handler_list_type *gListHandler = NULL;
+    // em_event_id_type *evt_handler = NULL;
+    // em_handler_list_type *eListHandler = NULL;
     int16_t isbackupreq = -1;
 
-    if(event != NULL) {
+    /* Search registered groupname */
+    int16_t group_index = get_registered_groupID(eventgroup);
+
+    /* move from stack to static */
+    event_msg_backup = NULL;
+    current_event = NULL;
+    group = NULL;
+    gListHandler = NULL;
+    evt_handler = NULL;
+    eListHandler = NULL;
+
+    if(group_index < 0) {
         #ifdef PC_SIMULATION
-        current_event = (em_event_arg_type *)malloc(sizeof(em_event_arg_type));
+        printf("Group name(%s) is not registered!!!\n", eventgroup->name);
         #else
-        current_event = (em_event_arg_type *)pvPortMalloc(sizeof(em_event_arg_type));
-        #endif 
-        memcpy(current_event, event, sizeof(em_event_arg_type));
+        DEBUGERR(GEN,"Group name(%s) is not registered!!!\n", eventgroup->name);
+        #endif  
+        return;
+    }
+
+    if(event != NULL) {
+        memcpy(&trigger_event, event, sizeof(em_event_arg_type));
+        current_event = &trigger_event;
 
         #if (HANDLER_REQUIRED_MEMORYFREE > 0)
         isbackupreq = is_event_backup_require(group_index, event, signal);
@@ -434,39 +490,25 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
         /* memory free 는 event manager에서 수행 됨 */
         current_event->isconst = 1;
         #endif
-
-    }
-    else {
-        current_event = NULL;
     }
 
-    /* Search registered groupname */
-    int16_t group_index = check_is_registered_group(groupname);
-    if(group_index < 0) {
-        #ifdef PC_SIMULATION
-        printf("Group name(%s) is not registered!!!\n", groupname);
-        #else
-        DEBUGERR(GEN,"Group name(%s) is not registered!!!\n", groupname);
-        #endif  
-        return;
-    }
-
-    em_event_group_type *group = &root_event_list.group[group_index];
+    group = &root_event_list.group[group_index];
     /* 1. Group handler 
     */    
-    em_handler_list_type *gListHandler = group->grphandler;
+    gListHandler = group->grphandler;
 
     if(gListHandler != NULL) {
         /* default handler */
         #if (DEFAULT_HANDLER_NO_MEM_FREE > 0)
-        gListHandler->handler(groupname, signal, current_event);
+        gListHandler->handler(eventgroup->name, signal, current_event);
         gListHandler = gListHandler->pNext;
         #endif
+
         while (gListHandler != NULL) {
             if(isbackupreq > 0) {
-                event_msg_backup = em_NewMem(current_event);
+                event_msg_backup = em_NewEventMem(current_event);
             }
-            gListHandler->handler(groupname, signal, current_event);
+            gListHandler->handler(eventgroup->name, signal, current_event);
             gListHandler = gListHandler->pNext;
 
             if(event_msg_backup != NULL) {
@@ -481,13 +523,13 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
 
     /* 2. Event handler 
     */    
-    em_event_id_type *evt_handler = getEventHandler(group, signal);
-    em_handler_list_type *eListHandler = evt_handler->handler;
+    evt_handler = getEventHandler(group, signal);
+    eListHandler = evt_handler->handler;
     while (eListHandler != NULL) {
         if(isbackupreq > 0) {
-            event_msg_backup = em_NewMem(current_event);
+            event_msg_backup = em_NewEventMem(current_event);
         }
-        eListHandler->handler(groupname, signal, current_event);
+        eListHandler->handler(eventgroup->name, signal, current_event);
         eListHandler = eListHandler->pNext;
 
         if(event_msg_backup != NULL) {
@@ -503,13 +545,6 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
         #endif 
     }
 
-    if(current_event) {
-        #ifdef PC_SIMULATION
-            free(current_event);
-        #else
-            vPortFree(current_event);
-        #endif 
-    }
     #if (HANDLER_REQUIRED_MEMORYFREE <= 0)
     EM_IS_MEMFREEREQUIRED(event);
     #endif
@@ -524,4 +559,9 @@ void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *
 void em_initialize(void)
 {
     memset(&root_event_list, 0x00, sizeof(em_event_group_list_type));
+
+    for(int i=0; i<MAX_ROOT_EVENT_GROUP_COUNT; i++ ) {
+        root_event_list.group[i].event_group.gid = -1;
+    }
+
 }

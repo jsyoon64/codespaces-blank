@@ -31,10 +31,11 @@
 /* Private defines -----------------------------------------------------------*/
 #define PC_SIMULATION
 
+#define DEFAULT_HANDLER_NO_MEM_FREE             (1)
+
 /* 1: handler function에서 memory free 수행 해야 함
   -1: event manager에서 memory free 수행 함.
 */
-#define DEFAULT_HANDLER_NO_MEM_FREE             (1)
 #define HANDLER_REQUIRED_MEMORYFREE             (-1)
 
 /* 1: 각 group별 event enum이 0 부터 시작 해서 순서 대로 되어 있어 event갯수로 한꺼번에 register 됨
@@ -71,6 +72,11 @@ typedef struct
     void *      msg;
 } em_event_arg_type;
 
+typedef struct 
+{
+    const char  *name;
+    int32_t     gid; 
+} em_group_name_type;
 
 typedef void (*evt_handler_fp)(const char*, int16_t, em_event_arg_type *);
 
@@ -92,7 +98,7 @@ typedef struct sEM_ID_HANDLER_T
 
 typedef struct 
 {
-    const char              *name;
+    em_group_name_type      event_group;
     em_handler_list_type    *grphandler; // Group handler
     em_event_id_type        *evthandler;
     uint16_t                group_evt_cnt;
@@ -123,15 +129,15 @@ typedef struct
 /* Exported functions prototypes ---------------------------------------------*/
 
 /* Event request */
-void em_on_event(const char *groupname, int16_t signal, evt_handler_fp handler);
+void em_on_event(em_group_name_type *eventgroup, int16_t signal, evt_handler_fp handler);
 
 /*---------------------------------------------*/
 /* Event register */
-void em_events_register(const char *, int16_t );
+void em_events_register(em_group_name_type *, int16_t );
 
 /*---------------------------------------------*/
 /* Event trigger */
-void em_event_trigger(const char *groupname, int16_t signal, em_event_arg_type *event);
+void em_event_trigger(em_group_name_type *eventgroup, int16_t signal, em_event_arg_type *event);
 
 /*---------------------------------------------*/
 /* Event manager initialize */
